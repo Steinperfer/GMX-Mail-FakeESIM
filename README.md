@@ -20,16 +20,3 @@ apksigner (aus Android SDK build-tools)
 Python 3
 
 Java (für keytool)
-
-✨ Vorteile
-Ein-Klick-Lösung für den Benutzer
-
-Kein GitHub-Release nötig
-
-Immer aktuelle Basis (holt APK direkt vom Handy)
-
-Automatische Keystore-Erstellung
-
-Funktioniert mit oder ohne Splits
-
-Das ist die sauberste Lösung – teile einfach dieses Script. 👍
