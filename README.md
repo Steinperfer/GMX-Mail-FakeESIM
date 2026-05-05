@@ -11,10 +11,10 @@ bash
 nano CrackGMXAPK.sh
 
 2. Ausführbar machen
-chmod +x patch_gmx.sh
+chmod +x CrackGMXAPK.sh
 
 3. Ausführen
-./patch_gmx.sh
+./CrackGMXAPK.sh
 
 4. Bugs beheben, Script ist nicht getestet
    und wurde anhand meiner konsolen vergangenheit von einem LLm Generiert!
