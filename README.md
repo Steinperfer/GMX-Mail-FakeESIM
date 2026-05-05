@@ -2,7 +2,7 @@
 GMX apk mit der die ESIM funktionen immeraktiv sind auch auf geräten ohne ESIM unterstürtzung, Deutsch DE, APK Download
 
 # ----------------------------------
-# Geptached APK bei Release
+# Geptached APK bei (V12) Release
 # ----------------------------------
 
 # 🚀 Selber Patchen?
