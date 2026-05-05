@@ -15,6 +15,10 @@ chmod +x patch_gmx.sh
 
 3. Ausführen
 ./patch_gmx.sh
+
+4. Bugs beheben, Script ist nicht getestet
+   und wurde anhand meiner konsolen vergangenheit von einem LLm Generiert!
+   
 # 📋 Voraussetzungen (prüft das Script automatisch)
 adb (Android Platform Tools)
 
