@@ -1,5 +1,6 @@
 # GMX-Mail-FakeESIM
 GMX apk mit der die ESIM funktionen dauerhaft aktiv sind, auch auf geräten ohne ESIM unterstürtzung, Deutsch DE, APK Download
+SureSim&SecureElementAccses nicht mehr nötig
 
 # ----------------------------------
 # Geptached APK bei (V12) Release
