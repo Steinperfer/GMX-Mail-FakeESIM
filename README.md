@@ -5,7 +5,7 @@ GMX apk mit der die ESIM funktionen immeraktiv sind auch auf geräten ohne ESIM 
 # Geptached APK bei Release
 # ----------------------------------
 
-# 🚀 So benutzen:
+# 🚀 Selber Patchen?
 bash
 1. Script speichern
 nano CrackGMXAPK.sh
