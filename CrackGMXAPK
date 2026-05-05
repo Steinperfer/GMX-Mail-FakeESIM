@@ -1,0 +1,151 @@
+#!/bin/bash
+
+# Farben für Ausgabe
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${YELLOW}🚀 GMX Mail eSIM Patcher - Automatisches Script${NC}"
+echo "====================================================="
+
+# Prüfen ob adb verfügbar ist
+if ! command -v adb &> /dev/null; then
+    echo -e "${RED}❌ adb nicht gefunden. Bitte Android Platform Tools installieren.${NC}"
+    exit 1
+fi
+
+# Prüfen ob Gerät verbunden ist
+if ! adb devices | grep -q "device$"; then
+    echo -e "${RED}❌ Kein Gerät gefunden. Bitte Handy per USB verbinden und USB-Debugging aktivieren.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ Gerät gefunden${NC}"
+
+# Originale GMX APK Pfad ermitteln
+echo -e "${YELLOW}📦 Originale GMX App wird lokalisiert...${NC}"
+BASE_PATH=$(adb shell pm path de.gmx.mobile.android.mail | grep base.apk | cut -d ':' -f2 | tr -d '\r')
+
+if [ -z "$BASE_PATH" ]; then
+    echo -e "${RED}❌ GMX Mail ist nicht installiert. Bitte aus Play Store installieren.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ Gefunden: $BASE_PATH${NC}"
+
+# Splits ermitteln
+SPLIT_ARM64=$(adb shell pm path de.gmx.mobile.android.mail | grep split_config.arm64_v8a.apk | cut -d ':' -f2 | tr -d '\r')
+SPLIT_DE=$(adb shell pm path de.gmx.mobile.android.mail | grep split_config.de.apk | cut -d ':' -f2 | tr -d '\r')
+SPLIT_XXHDPI=$(adb shell pm path de.gmx.mobile.android.mail | grep split_config.xxhdpi.apk | cut -d ':' -f2 | tr -d '\r')
+
+# Arbeitsverzeichnis erstellen
+WORKDIR="gmx_patch_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$WORKDIR"
+cd "$WORKDIR"
+
+echo -e "${YELLOW}📥 Lade originale APKs herunter...${NC}"
+adb pull "$BASE_PATH" base.apk
+[ -n "$SPLIT_ARM64" ] && adb pull "$SPLIT_ARM64" split_arm64.apk
+[ -n "$SPLIT_DE" ] && adb pull "$SPLIT_DE" split_de.apk
+[ -n "$SPLIT_XXHDPI" ] && adb pull "$SPLIT_XXHDPI" split_xxhdpi.apk
+
+echo -e "${YELLOW}🔧 Entpacke APK...${NC}"
+apktool d base.apk -o base_extracted
+
+# Patch 1: EuiccManagerWrapper - immer true
+echo -e "${YELLOW}🔨 Patch 1/2: EuiccManagerWrapper...${NC}"
+WRAPPER_FILE="base_extracted/smali_classes9/com/unitedinternet/portal/android/mail/esim/abstraction/EuiccManagerWrapper.smali"
+if [ -f "$WRAPPER_FILE" ]; then
+    python3 << 'EOF'
+import re
+file_path = "$WRAPPER_FILE"
+with open(file_path, 'r') as f:
+    content = f.read()
+new_method = '''.method public final isEuiccEnabled()Z
+    .locals 1
+    const/4 v0, 0x1
+    return v0
+.end method'''
+pattern = r'\.method public final isEuiccEnabled\(\)Z.*?\.end method'
+content = re.sub(pattern, new_method, content, flags=re.DOTALL)
+with open(file_path, 'w') as f:
+    f.write(content)
+EOF
+    echo -e "${GREEN}✅ EuiccManagerWrapper gepatcht${NC}"
+else
+    echo -e "${RED}❌ Konnte EuiccManagerWrapper.smali nicht finden${NC}"
+fi
+
+# Patch 2: EsimTrackerHelper - fake EID
+echo -e "${YELLOW}🔨 Patch 2/2: EsimTrackerHelper...${NC}"
+TRACKER_FILE="base_extracted/smali_classes3/com/unitedinternet/portal/tracking/EsimTrackerHelper.smali"
+if [ -f "$TRACKER_FILE" ]; then
+    python3 << 'EOF'
+import re
+file_path = "$TRACKER_FILE"
+with open(file_path, 'r') as f:
+    content = f.read()
+new_method = '''.method public final trackEsimCapabilities()V
+    .locals 2
+    const-string v0, "89049032000008888888888888888888"
+    const/4 v1, 0x1
+    return-void
+.end method'''
+pattern = r'\.method public final trackEsimCapabilities\(\)V.*?\.end method'
+content = re.sub(pattern, new_method, content, flags=re.DOTALL)
+with open(file_path, 'w') as f:
+    f.write(content)
+EOF
+    echo -e "${GREEN}✅ EsimTrackerHelper gepatcht${NC}"
+else
+    echo -e "${RED}❌ Konnte EsimTrackerHelper.smali nicht finden${NC}"
+fi
+
+# APK neu bauen
+echo -e "${YELLOW}🔨 Baue gepatchte APK...${NC}"
+apktool b base_extracted -o base_patched.apk
+
+# Keystore erstellen (falls nicht vorhanden)
+if [ ! -f ~/.android/gmx.keystore ]; then
+    echo -e "${YELLOW}🔑 Erstelle Keystore...${NC}"
+    keytool -genkey -v -keystore ~/.android/gmx.keystore -alias gmx -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=GMX Patcher"
+fi
+
+# Signieren
+echo -e "${YELLOW}✍️ Signiere APK...${NC}"
+apksigner sign --ks ~/.android/gmx.keystore --ks-pass pass:android base_patched.apk
+
+# Splits signieren (falls vorhanden)
+for split in split_arm64.apk split_de.apk split_xxhdpi.apk; do
+    if [ -f "$split" ]; then
+        apksigner sign --ks ~/.android/gmx.keystore --ks-pass pass:android "$split"
+    fi
+done
+
+# Originale GMX App deinstallieren
+echo -e "${YELLOW}🗑️  Deinstalliere originale GMX App...${NC}"
+adb uninstall de.gmx.mobile.android.mail
+
+# Installieren
+echo -e "${YELLOW}📲 Installiere gepatchte GMX App...${NC}"
+if [ -f split_arm64.apk ] || [ -f split_de.apk ] || [ -f split_xxhdpi.apk ]; then
+    # Splits vorhanden
+    INSTALL_CMD="adb install-multiple base_patched.apk"
+    [ -f split_arm64.apk ] && INSTALL_CMD="$INSTALL_CMD split_arm64.apk"
+    [ -f split_de.apk ] && INSTALL_CMD="$INSTALL_CMD split_de.apk"
+    [ -f split_xxhdpi.apk ] && INSTALL_CMD="$INSTALL_CMD split_xxhdpi.apk"
+    eval $INSTALL_CMD
+else
+    # Nur base.apk
+    adb install base_patched.apk
+fi
+
+echo -e "${GREEN}✅ FERTIG!${NC}"
+echo -e "${YELLOW}📱 Starte GMX App...${NC}"
+adb shell am start -n de.gmx.mobile.android.mail/com.unitedinternet.portal.ui.HostActivity
+
+echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}🎉 eSIM ist jetzt IMMER AKTIV!${NC}"
+echo -e "${GREEN}   Keine System-Checks mehr!${NC}"
+echo -e "${GREEN}================================${NC}"
